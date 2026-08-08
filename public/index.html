@@ -1,19 +1,230 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080808"><title>DGL Cloud</title><link rel="manifest" href="/manifest.json"><link rel="stylesheet" href="/styles.css"></head><body>
-<div id="login" class="login"><div class="login-card"><p class="eyebrow">DIVINE GOLDEN LUCK</p><h1>DGL Cloud</h1><p>Ingresa tu clave de administración.</p><input id="adminKey" type="password" placeholder="Clave"><button id="loginBtn" class="primary">Entrar</button><small id="loginError"></small></div></div>
-<header class="topbar"><div><p class="eyebrow">DIVINE GOLDEN LUCK</p><h1>DGL Cloud</h1></div><div class="status" id="globalStatus"><span></span> Conectando</div></header>
-<main><section class="card controls">
-  <div class="section-title">
-    <h3>Máquina</h3>
-    <small>Selecciona cuál controlar</small>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070706">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Devine Golden Lock · Control Center</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div id="login" class="login-screen">
+    <div class="login-glow"></div>
+    <div class="login-card">
+      <div class="crest">DGL</div>
+      <p class="eyebrow">DEVINE GOLDEN LOCK</p>
+      <h1>Control Center</h1>
+      <p class="login-copy">Administración privada de máquinas y telemetría.</p>
+      <input id="adminKey" type="password" autocomplete="current-password" placeholder="Clave de administración">
+      <button id="loginBtn" class="btn btn-gold">Entrar</button>
+      <small id="loginError" class="error-text"></small>
+    </div>
   </div>
 
-  <select id="machineSelect">
-    <option value="DGL-01">Cascada Galería Esmeralda</option>
-    <option value="DGL-02">Cascada Boulevard</option>
-  </select>
-</section><section class="hero card"><div><p class="muted" id="machineLocation">Los Andes</p><h2 id="machineName">Galería Esmeralda</h2></div><div class="online-pill" id="onlinePill">SIN DATOS</div></section>
-<section class="money-grid"><article class="metric card gold"><span>Hoy</span><strong id="today">$0</strong></article><article class="metric card"><span>Semana</span><strong id="week">$0</strong></article><article class="metric card"><span>Mes</span><strong id="month">$0</strong></article><article class="metric card"><span>Histórico</span><strong id="historic">$0</strong></article></section>
-<section class="two-columns"><article class="card changer"><div class="section-title"><h3>Cambiador 1</h3><span id="state1">SIN DATOS</span></div><div class="row"><span>Ingresado</span><b id="in1">$0</b></div><div class="row"><span>Entregado</span><b id="out1">$0</b></div><div class="row"><span>Pendiente</span><b id="pending1">0 monedas</b></div></article><article class="card changer"><div class="section-title"><h3>Cambiador 2</h3><span id="state2">SIN DATOS</span></div><div class="row"><span>Ingresado</span><b id="in2">$0</b></div><div class="row"><span>Entregado</span><b id="out2">$0</b></div><div class="row"><span>Pendiente</span><b id="pending2">0 monedas</b></div></article></section>
-<section class="card controls"><div class="section-title"><h3>Pago remoto</h3><small>Múltiplos de $100</small></div><div class="pay-line"><select id="changer"><option value="1">Cambiador 1</option><option value="2">Cambiador 2</option></select><input id="amount" type="number" min="100" max="20000" step="100" value="500"><button class="primary" id="payBtn">Pagar</button></div><div class="quick-buttons"><button data-pay="100">$100</button><button data-pay="500">$500</button><button data-pay="1000">$1.000</button><button data-pay="5000">$5.000</button></div></section>
-<section class="card controls"><div class="section-title"><h3>Controles</h3><small id="wifi">WiFi: -- dBm</small></div><div class="action-grid"><button data-command="reset_error">Reiniciar errores</button><button data-command="next_song">Siguiente canción</button><button data-command="set_mute" data-value="true">Silenciar</button><button data-command="set_mute" data-value="false">Activar audio</button><button data-command="change_wifi" class="danger-outline">Cambiar WiFi</button><button data-command="restart_esp" class="danger-outline">Reiniciar ESP32</button></div><div class="volume-line"><label>Volumen <b id="volumeLabel">22</b></label><input id="volume" type="range" min="0" max="30" value="22"></div><div class="voice-line"><select id="voice"><option value="1">Sistema funcionando con normalidad</option><option value="2">Un técnico acudirá en breve</option><option value="3">Error cambiador 1</option><option value="4">Error cambiador 2</option><option value="5">Por favor no golpee la máquina</option><option value="6">Por favor no mueva la máquina</option><option value="7">Sin monedas suficientes</option><option value="8">Solicite una transferencia mediante el código QR</option><option value="9">Bienvenido a Divine Golden Luck</option><option value="10">Cambie aquí sus billetes por monedas</option><option value="11">Aceptamos billetes desde $1.000 hasta $20.000</option><option value="12">Tenemos un nuevo ganador</option><option value="13">Aquí no mi amor</option><option value="14">Mucha suerte en tu próxima jugada</option><option value="15">Sistema restablecido correctamente</option><option value="16">La suerte podría estar a solo un intento de distancia</option><option value="17">Sigue intentándolo, el próximo premio podría ser tuyo</option><option value="18">Golpear la máquina no aumenta las probabilidades de ganar</option><option value="19">Ganador Pelucheras</option><option value="20">Ven y conoce Divine Golden Luck</option><option value="21">Cambia tus billetes por monedas en esta máquina</option><option value="22">Recuerda que está prohibido mover o golpear la máquina</option><option value="23">Si tienes inconvenientes háblanos al WhatsApp</option><option value="24">Si no tienes efectivo puedes transferir al WhatsApp</option><option value="25">Ganaste un bono de cliente frecuente</option></select><button id="voiceBtn">Reproducir voz</button></div></section>
-<section class="card events"><div class="section-title"><h3>Actividad reciente</h3><button class="tiny" id="logoutBtn">Salir</button></div><div id="events"><p class="muted">Sin eventos.</p></div></section></main><div id="toast" class="toast"></div><script src="/app.js"></script></body></html>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mini-crest">DGL</div>
+      <div>
+        <p class="eyebrow">DEVINE GOLDEN LOCK</p>
+        <h1>Control Center</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div id="serverPill" class="server-pill"><i></i><span>Conectando</span></div>
+      <button id="logoutBtn" class="icon-btn" title="Cerrar sesión">Salir</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="fleet-hero">
+      <div>
+        <p class="section-kicker">FLOTA EN TIEMPO REAL</p>
+        <h2>Panel central</h2>
+        <p class="subtle">Todas las máquinas que reporten al servidor aparecerán automáticamente aquí.</p>
+      </div>
+      <div class="fleet-stats">
+        <article><span>Máquinas</span><strong id="fleetTotal">0</strong></article>
+        <article><span>Online</span><strong id="fleetOnline">0</strong></article>
+        <article><span>Hoy</span><strong id="fleetToday">$0</strong></article>
+        <article><span>Errores</span><strong id="fleetErrors">0</strong></article>
+      </div>
+    </section>
+
+    <section class="section-head">
+      <div>
+        <p class="section-kicker">MÁQUINAS</p>
+        <h2>Selecciona una unidad</h2>
+      </div>
+      <button id="refreshFleetBtn" class="btn btn-soft">Actualizar</button>
+    </section>
+
+    <section id="machineGrid" class="machine-grid">
+      <div class="empty-card">Esperando máquinas…</div>
+    </section>
+
+    <section id="detailShell" class="detail-shell hidden">
+      <div class="detail-top">
+        <button id="backBtn" class="btn btn-soft">← Todas</button>
+        <div class="detail-title">
+          <div>
+            <p id="machineLocation" class="section-kicker">—</p>
+            <h2 id="machineName">Máquina</h2>
+          </div>
+          <div id="onlinePill" class="online-pill">SIN DATOS</div>
+        </div>
+      </div>
+
+      <section class="money-grid">
+        <article class="metric-card featured"><span>Hoy</span><strong id="today">$0</strong><small>recaudación actual</small></article>
+        <article class="metric-card"><span>Semana</span><strong id="week">$0</strong><small>acumulado</small></article>
+        <article class="metric-card"><span>Mes</span><strong id="month">$0</strong><small>acumulado</small></article>
+        <article class="metric-card"><span>Histórico</span><strong id="historic">$0</strong><small>total registrado</small></article>
+      </section>
+
+      <section class="status-grid">
+        <article class="glass-card">
+          <div class="card-title"><h3>Conectividad</h3><span id="wifiBadge" class="tiny-badge">—</span></div>
+          <div class="info-list">
+            <div><span>WiFi</span><b id="wifi">—</b></div>
+            <div><span>Última conexión</span><b id="lastSeen">—</b></div>
+            <div><span>ESP32</span><b id="espStatus">—</b></div>
+            <div><span>Tipo</span><b id="machineType">—</b></div>
+          </div>
+        </article>
+
+        <article class="glass-card">
+          <div class="card-title"><h3>Ingresos</h3><span class="tiny-badge">Detalle</span></div>
+          <div class="info-list">
+            <div><span>Billetes</span><b id="bills">—</b></div>
+            <div><span>Monedas</span><b id="coins">—</b></div>
+            <div><span>Total entregado</span><b id="totalOut">$0</b></div>
+            <div><span>Dinero actual</span><b id="cashCurrent">—</b></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="cascadeSection">
+        <div class="section-head compact">
+          <div>
+            <p class="section-kicker">CAMBIADORES</p>
+            <h2>Estado operativo</h2>
+          </div>
+        </div>
+
+        <section class="two-columns">
+          <article class="glass-card changer-card">
+            <div class="card-title"><h3>Cambiador 1</h3><span id="state1" class="tiny-badge">SIN DATOS</span></div>
+            <div class="info-list">
+              <div><span>Ingresado</span><b id="in1">$0</b></div>
+              <div><span>Entregado</span><b id="out1">$0</b></div>
+              <div><span>Pendiente</span><b id="pending1">0 monedas</b></div>
+            </div>
+          </article>
+
+          <article class="glass-card changer-card">
+            <div class="card-title"><h3>Cambiador 2</h3><span id="state2" class="tiny-badge">SIN DATOS</span></div>
+            <div class="info-list">
+              <div><span>Ingresado</span><b id="in2">$0</b></div>
+              <div><span>Entregado</span><b id="out2">$0</b></div>
+              <div><span>Pendiente</span><b id="pending2">0 monedas</b></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="glass-card control-panel">
+          <div class="card-title">
+            <div><p class="section-kicker">CONTROL REMOTO</p><h3>Operación</h3></div>
+            <span class="tiny-badge warn">Acciones reales</span>
+          </div>
+
+          <div class="control-block">
+            <label>Pago remoto</label>
+            <div class="pay-line">
+              <select id="changer">
+                <option value="1">Cambiador 1</option>
+                <option value="2">Cambiador 2</option>
+              </select>
+              <input id="amount" type="number" min="100" max="20000" step="100" value="500">
+              <button id="payBtn" class="btn btn-gold">Pagar</button>
+            </div>
+            <div class="quick-pay">
+              <button data-pay="100">$100</button>
+              <button data-pay="500">$500</button>
+              <button data-pay="1000">$1.000</button>
+              <button data-pay="5000">$5.000</button>
+            </div>
+          </div>
+
+          <div class="action-grid">
+            <button data-command="reset_error">Reiniciar errores</button>
+            <button data-command="next_song">Siguiente canción</button>
+            <button data-command="set_mute" data-value="true">Silenciar</button>
+            <button data-command="set_mute" data-value="false">Activar audio</button>
+            <button data-command="change_wifi">Cambiar WiFi</button>
+            <button data-command="restart_esp" class="danger">Reiniciar ESP32</button>
+          </div>
+
+          <div class="audio-controls">
+            <div>
+              <label>Volumen <b id="volumeLabel">22</b></label>
+              <input id="volume" type="range" min="0" max="30" value="22">
+            </div>
+            <div class="voice-row">
+              <select id="voice">
+                <option value="1">Espere un momento</option>
+                <option value="2">Sistema funcionando con normalidad</option>
+                <option value="3">Algo falló · técnico en breve</option>
+                <option value="4">Error cambiador 1</option>
+                <option value="5">Error cambiador 2</option>
+                <option value="6">Por favor no golpee la máquina</option>
+                <option value="7">Por favor no mueva la máquina</option>
+                <option value="8">Sin monedas suficientes</option>
+                <option value="9">¿No sabes cómo jugar?</option>
+                <option value="10">Acércate aquí y prueba tu suerte</option>
+                <option value="11">Hoy es tu día de suerte</option>
+                <option value="12">La máquina cuenta con cambiadores</option>
+                <option value="13">Aquí no mi amor</option>
+                <option value="14">Mucha suerte en tu próxima jugada</option>
+                <option value="15">Sistema restablecido correctamente</option>
+                <option value="16">La suerte podría estar a solo un intento</option>
+                <option value="17">Sigue intentándolo</option>
+                <option value="18">Golpear no aumenta las probabilidades</option>
+                <option value="19">Ganador Pelucheras</option>
+                <option value="20">Ven y conoce Devine Golden Lock</option>
+                <option value="21">Cambia tus billetes por monedas aquí</option>
+                <option value="22">Prohibido mover o golpear la máquina</option>
+                <option value="23">Inconvenientes · WhatsApp</option>
+                <option value="24">Transferencia · WhatsApp</option>
+                <option value="25">Bono de cliente frecuente</option>
+              </select>
+              <button id="voiceBtn" class="btn btn-soft">Reproducir voz</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section id="futureDeviceCard" class="glass-card hidden">
+        <div class="card-title">
+          <div><p class="section-kicker">MÓDULO CONECTADO</p><h3>Telemetría de máquina</h3></div>
+          <span class="tiny-badge">Preparado</span>
+        </div>
+        <p class="subtle">Esta vista está preparada para pelucheras, pinball, islas y nuevos ESP32. Cuando el firmware envíe campos específicos, se podrán mostrar aquí sin rehacer el panel completo.</p>
+      </section>
+
+      <section class="glass-card activity-card">
+        <div class="card-title">
+          <div><p class="section-kicker">REGISTRO</p><h3>Actividad reciente</h3></div>
+          <button id="refreshDetailBtn" class="btn btn-soft small">Actualizar</button>
+        </div>
+        <div id="events" class="events"><p class="subtle">Sin eventos.</p></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
