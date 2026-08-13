@@ -2,12 +2,6 @@ services:
   - type: web
     name: dgl-cloud
     runtime: node
-    plan: free
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
-    envVars:
-      - key: DGL_DEVICE_API_KEY
-        generateValue: true
-      - key: DGL_ADMIN_KEY
-        generateValue: true

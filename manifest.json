@@ -1,0 +1,9 @@
+{
+  "name": "Devine Golden Luck Control Center",
+  "short_name": "DGL Cloud",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080807",
+  "theme_color": "#0a0908",
+  "description": "Centro privado de control y recaudación DGL"
+}
