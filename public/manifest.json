@@ -1,9 +1,0 @@
-{
-  "name": "Devine Golden Lock Control Center",
-  "short_name": "DGL Control",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#070706",
-  "theme_color": "#070706",
-  "icons": []
-}
