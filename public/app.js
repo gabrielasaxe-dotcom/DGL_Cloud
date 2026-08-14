@@ -1,101 +1,1552 @@
 const $ = id => document.getElementById(id);
-const money = value => new Intl.NumberFormat('es-CL',{style:'currency',currency:'CLP',maximumFractionDigits:0}).format(Number(value||0));
-const ACTION_PIN = '2324';
+
+const money = value =>
+  new Intl.NumberFormat('es-CL', {
+    style: 'currency',
+    currency: 'CLP',
+    maximumFractionDigits: 0
+  }).format(Number(value || 0));
+
+const VOICES = [
+  'Espere un momento',
+  'Sistema funcionando con normalidad',
+  'Algo falló · técnico en breve',
+  'Error cambiador 1',
+  'Error cambiador 2',
+  'Por favor no golpee la máquina',
+  'Por favor no mueva la máquina',
+  'Sin monedas suficientes',
+  '¿No sabes cómo jugar?',
+  'Acércate aquí y prueba tu suerte',
+  'Hoy es tu día de suerte',
+  'La máquina cuenta con cambiadores',
+  'Aquí no mi amor',
+  'Mucha suerte en tu próxima jugada',
+  'Sistema restablecido correctamente',
+  'La suerte podría estar a solo un intento',
+  'Sigue intentándolo',
+  'Golpear no aumenta las probabilidades',
+  'Ganador Pelucheras',
+  'Ven y conoce Devine Golden Luck',
+  'Cambia tus billetes por monedas aquí',
+  'Prohibido mover o golpear la máquina',
+  'Inconvenientes · WhatsApp',
+  'Transferencia · WhatsApp',
+  'Bono de cliente frecuente'
+];
+
 let adminKey = localStorage.getItem('dglAdminKey') || '';
-let selectedMachineId = localStorage.getItem('dglMachineId') || '';
-let collectionMachineId = localStorage.getItem('dglCollectionMachineId') || '';
-let fleet = [];
+let machineId = localStorage.getItem('dglMachineId') || 'DGL-01';
 
-function toast(message){const el=$('toast');if(!el)return;el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
-function text(id,value){const el=$(id);if(el)el.textContent=value}
-function escapeHtml(v){return String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-async function api(url,options={}){const headers={'Content-Type':'application/json',...(options.headers||{})};if(adminKey)headers['x-admin-key']=adminKey;const r=await fetch(url,{...options,headers});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d}
-function kindOf(m){const s=`${m?.id||''} ${m?.name||''}`.toLowerCase();if(s.includes('peluch'))return'Peluchera';if(s.includes('pinball'))return'Pinball';if(s.includes('isla'))return'Isla';if(s.includes('cascada'))return'Cascada';return'Máquina'}
-function isCascade(m){return kindOf(m)==='Cascada'||/dgl-0[12]\b/i.test(m?.id||'')}
-function valueAny(t,keys){for(const k of keys){if(t[k]!==undefined&&t[k]!==null)return t[k]}return null}
+let currentMachine = null;
+let collectionData = null;
+let refreshTimer = null;
+let pendingModalAction = null;
 
-function renderFleet(){
-  const grid=$('machineGrid');
-  const online=fleet.filter(m=>m.online).length;
-  const today=fleet.reduce((a,m)=>a+Number(m.telemetry?.totalToday||0),0);
-  const current=fleet.reduce((a,m)=>a+Number(m.collection?.current||0),0);
-  text('fleetTotal',fleet.length);text('fleetOnline',online);text('fleetToday',money(today));text('fleetCurrent',money(current));
-  if(!fleet.length){grid.innerHTML='<div class="empty-card">Todavía no hay máquinas reportando al servidor.</div>';return}
-  grid.innerHTML=fleet.map(m=>{const t=m.telemetry||{},kind=kindOf(m);return `<article class="machine-card" data-machine="${escapeHtml(m.id)}"><div class="machine-card-head"><div><p class="section-kicker">${escapeHtml(kind.toUpperCase())} · ${escapeHtml(m.id)}</p><h3>${escapeHtml(m.name||m.id)}</h3><div class="loc">${escapeHtml(m.location||'Ubicación sin definir')}</div></div><span class="machine-status ${m.online?'online':''}"></span></div><div class="machine-card-metrics"><div><span>Hoy</span><b>${money(t.totalToday)}</b></div><div><span>Por recaudar</span><b>${money(m.collection?.current)}</b></div><div><span>Estado</span><b>${m.online?'ONLINE':'OFFLINE'}</b></div><div><span>WiFi</span><b>${t.wifiRssi??'—'} dBm</b></div></div><div class="machine-card-foot"><span>${m.collection?.count||0} recaudaciones</span><span>Abrir →</span></div></article>`}).join('');
-  grid.querySelectorAll('[data-machine]').forEach(card=>card.onclick=()=>openMachine(card.dataset.machine));
-  fillCollectionMachineSelector();
+
+/* =========================================================
+   UTILIDADES
+========================================================= */
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(
+    /[&<>'"]/g,
+    char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    })[char]
+  );
 }
 
-async function loadFleet(){const data=await api('/api/machines');fleet=data.machines||[];$('serverPill')?.classList.add('ok');if($('serverPill')?.querySelector('span'))$('serverPill').querySelector('span').textContent='Servidor online';renderFleet()}
-async function openMachine(id){selectedMachineId=id;localStorage.setItem('dglMachineId',id);$('detailShell').classList.remove('hidden');$('machineGrid').classList.add('hidden');document.querySelector('.fleet-section-head')?.classList.add('hidden');await refreshSelected();window.scrollTo({top:0,behavior:'smooth'})}
-function closeMachine(){$('detailShell').classList.add('hidden');$('machineGrid').classList.remove('hidden');document.querySelector('.fleet-section-head')?.classList.remove('hidden');selectedMachineId='';localStorage.removeItem('dglMachineId')}
-function renderMachine(m){
-  const t=m.telemetry||{},kind=kindOf(m);
-  text('machineName',m.name||m.id);text('machineLocation',`${m.location||'Ubicación sin definir'} · ${m.id}`);
-  text('today',money(t.totalToday));text('week',money(t.totalWeek));text('currentCollection',money(m.collection?.current));
-  text('in1',money(t.totalIn1));text('in2',money(t.totalIn2));text('out1',money(t.totalOut1));text('out2',money(t.totalOut2));
-  text('pending1',`${t.pending1||0} monedas`);text('pending2',`${t.pending2||0} monedas`);text('state1',t.state1||'SIN DATOS');text('state2',t.state2||'SIN DATOS');
-  text('wifi',`${t.wifiRssi??'—'} dBm`);text('machineType',kind);text('espStatus',m.online?'Conectado':'Sin conexión');text('lastSeen',m.updatedAt?new Date(m.updatedAt).toLocaleString('es-CL'):'Sin datos');
-  const wb=$('wifiBadge');if(wb)wb.textContent=t.wifiRssi>-65?'Excelente':t.wifiRssi>-78?'Buena':'Débil';const p=$('onlinePill');if(p){p.textContent=m.online?'ONLINE':'OFFLINE';p.classList.toggle('online',m.online)}
-  const bills=valueAny(t,['totalBills','bills','billTotal','totalBilletes']);const coins=valueAny(t,['totalCoins','coins','coinTotal','totalMonedas']);const cash=valueAny(t,['cashCurrent','currentCash','moneyCurrent','dineroActual']);
-  text('bills',bills===null?'—':money(bills));text('coins',coins===null?'—':money(coins));text('cashCurrent',cash===null?'—':money(cash));text('totalOut',money(Number(t.totalOut1||0)+Number(t.totalOut2||0)));
-  if($('volume'))$('volume').value=t.audioVolume??22;text('volumeLabel',t.audioVolume??22);$('cascadeSection').classList.toggle('hidden',!isCascade(m));$('futureDeviceCard').classList.toggle('hidden',isCascade(m));
-  $('events').innerHTML=(m.events||[]).slice(0,50).map(e=>`<div class="event"><time>${new Date(e.at).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</time><p>${escapeHtml(e.message)}</p></div>`).join('')||'<p class="subtle">Sin eventos.</p>';
-}
-async function refreshSelected(){if(!selectedMachineId)return;const data=await api(`/api/machines/${selectedMachineId}`);renderMachine(data.machine)}
-async function command(type,payload={}){if(!selectedMachineId)return toast('Selecciona una máquina');try{await api(`/api/machines/${selectedMachineId}/commands`,{method:'POST',body:JSON.stringify({type,payload})});toast(`Comando enviado a ${selectedMachineId}`)}catch(e){toast(e.message)}}
+function toast(message) {
+  const el = $('toast');
 
-async function confirmRemotePayment(amount){
-  const monto=Number(amount),changer=Number($('changer').value);
-  if(!Number.isInteger(monto)||monto<100||monto>20000||monto%100!==0)return toast('Monto inválido');
-  const code=window.prompt(`CONFIRMAR PAGO REMOTO\n\nMáquina: ${selectedMachineId}\nCambiador: ${changer}\nMonto: ${money(monto)}\n\nCódigo de confirmación:`);
-  if(code===null)return toast('Pago cancelado');
-  if(code.trim()!==ACTION_PIN)return toast('Código incorrecto. Pago cancelado.');
-  await command('pay',{changer,amount:monto,confirmationCode:code.trim()});
+  if (!el) {
+    return;
+  }
+
+  el.textContent = message;
+  el.classList.add('show');
+
+  setTimeout(() => {
+    el.classList.remove('show');
+  }, 2600);
 }
 
-function fillCollectionMachineSelector(){
-  const select=$('collectionMachineSelect');if(!select)return;
-  select.innerHTML=fleet.map(m=>`<option value="${escapeHtml(m.id)}">${escapeHtml(m.name||m.id)} · ${escapeHtml(m.id)}</option>`).join('');
-  if(!collectionMachineId||!fleet.some(m=>m.id===collectionMachineId))collectionMachineId=fleet[0]?.id||'';
-  select.value=collectionMachineId;
+function setText(id, value) {
+  const el = $(id);
+
+  if (el) {
+    el.textContent = value;
+  }
 }
 
-async function loadCollections(){
-  if(!collectionMachineId)return;
-  const data=await api(`/api/machines/${collectionMachineId}/collections`);
-  text('collectionCurrent',money(data.current));text('collectionHistoric',money(data.historic));text('collectionTotal',money(data.totalCollected));text('collectionCount',data.collections.length);
-  const list=$('collectionsList');
-  list.innerHTML=(data.collections||[]).map(item=>`<div class="collection-row"><time>${new Date(item.at).toLocaleString('es-CL')}</time><div><b>${money(item.amount)}</b><small>Histórico al cierre: ${money(item.historicAtCollection)}</small></div><span class="tiny-badge">Registrada</span></div>`).join('')||'<p class="subtle">Sin recaudaciones registradas.</p>';
+function fmtDate(iso) {
+  if (!iso) {
+    return '—';
+  }
+
+  return new Date(iso).toLocaleString(
+    'es-CL',
+    {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }
+  );
 }
 
-async function registerCollection(){
-  if(!collectionMachineId)return toast('Selecciona una máquina');
-  const machine=fleet.find(m=>m.id===collectionMachineId);const current=machine?.collection?.current??0;
-  const code=window.prompt(`REGISTRAR RECAUDACIÓN\n\nMáquina: ${machine?.name||collectionMachineId}\nMonto actual: ${money(current)}\n\nCódigo de confirmación:`);
-  if(code===null)return toast('Recaudación cancelada');
-  if(code.trim()!==ACTION_PIN)return toast('Código incorrecto. No se registró nada.');
-  try{
-    const result=await api(`/api/machines/${collectionMachineId}/collections`,{method:'POST',body:JSON.stringify({pin:code.trim()})});
-    toast(`Recaudación guardada: ${money(result.collection.amount)}`);
-    await loadFleet();await loadCollections();if(selectedMachineId===collectionMachineId)await refreshSelected();
-  }catch(e){toast(e.message)}
+
+/* =========================================================
+   API
+========================================================= */
+
+async function api(url, options = {}) {
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+
+  if (adminKey) {
+    headers['x-admin-key'] = adminKey;
+  }
+
+  const response = await fetch(
+    url,
+    {
+      ...options,
+      headers
+    }
+  );
+
+  let data = {};
+
+  try {
+    data = await response.json();
+  } catch (_) {
+    data = {
+      error: 'Respuesta inválida del servidor'
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.error ||
+      `Error HTTP ${response.status}`
+    );
+  }
+
+  return data;
 }
 
-function showPanel(){
-  $('panelView').classList.remove('hidden');$('collectionView').classList.add('hidden');$('panelNavBtn').classList.add('active');$('collectionNavBtn').classList.remove('active');
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
+async function login() {
+
+  adminKey = $('adminKey').value.trim();
+
+  $('loginError').textContent = '';
+
+  try {
+
+    await api(
+      '/api/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          key: adminKey
+        })
+      }
+    );
+
+    localStorage.setItem(
+      'dglAdminKey',
+      adminKey
+    );
+
+    $('login').classList.add('hidden');
+    $('app').classList.remove('hidden');
+
+    await loadMachines();
+    await refresh();
+
+    startRefresh();
+
+  } catch (error) {
+
+    $('loginError').textContent =
+      'Clave incorrecta o servidor no disponible';
+  }
 }
-async function showCollections(){
-  $('panelView').classList.add('hidden');$('collectionView').classList.remove('hidden');$('panelNavBtn').classList.remove('active');$('collectionNavBtn').classList.add('active');fillCollectionMachineSelector();await loadCollections();window.scrollTo({top:0,behavior:'smooth'});
+
+function logout() {
+
+  localStorage.removeItem(
+    'dglAdminKey'
+  );
+
+  adminKey = '';
+
+  location.reload();
 }
 
-async function login(){adminKey=$('adminKey').value.trim();try{await api('/api/login',{method:'POST',body:JSON.stringify({key:adminKey})});localStorage.setItem('dglAdminKey',adminKey);$('login').classList.add('hidden');text('loginError','');await loadFleet();if(selectedMachineId&&fleet.some(m=>m.id===selectedMachineId))await openMachine(selectedMachineId)}catch(e){text('loginError','Clave incorrecta')}}
 
-$('loginBtn').onclick=login;$('adminKey').onkeydown=e=>{if(e.key==='Enter')login()};$('logoutBtn').onclick=()=>{localStorage.removeItem('dglAdminKey');localStorage.removeItem('dglMachineId');location.reload()};
-$('panelNavBtn').onclick=showPanel;$('collectionNavBtn').onclick=()=>showCollections().catch(e=>toast(e.message));$('backBtn').onclick=closeMachine;$('refreshFleetBtn').onclick=()=>loadFleet().catch(e=>toast(e.message));$('refreshDetailBtn').onclick=()=>refreshSelected().catch(e=>toast(e.message));
-$('payBtn').onclick=()=>confirmRemotePayment($('amount').value);document.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>confirmRemotePayment(b.dataset.pay));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>b.dataset.command==='set_mute'?command('set_mute',{muted:b.dataset.value==='true'}):command(b.dataset.command,{}));
-let volumeTimer;$('volume').oninput=e=>{text('volumeLabel',e.target.value);clearTimeout(volumeTimer);volumeTimer=setTimeout(()=>command('set_volume',{volume:Number(e.target.value)}),500)};$('voiceBtn').onclick=()=>command('play_voice',{voice:Number($('voice').value)});
-$('collectionMachineSelect').onchange=e=>{collectionMachineId=e.target.value;localStorage.setItem('dglCollectionMachineId',collectionMachineId);loadCollections().catch(err=>toast(err.message))};$('registerCollectionBtn').onclick=registerCollection;$('refreshCollectionsBtn').onclick=()=>loadCollections().catch(e=>toast(e.message));
+/* =========================================================
+   MÁQUINAS
+========================================================= */
 
-async function start(){if(!adminKey)return;$('login').classList.add('hidden');try{await loadFleet();if(selectedMachineId&&fleet.some(m=>m.id===selectedMachineId))await openMachine(selectedMachineId)}catch(e){$('login').classList.remove('hidden')}}
-start();setInterval(()=>{if(adminKey){loadFleet().catch(()=>{});if(selectedMachineId)refreshSelected().catch(()=>{});if(!$('collectionView').classList.contains('hidden'))loadCollections().catch(()=>{})}},5000);
+async function loadMachines() {
+
+  const data =
+    await api('/api/machines');
+
+  const selector =
+    $('machineSelect');
+
+  selector.innerHTML = '';
+
+  data.machines.forEach(machine => {
+
+    const option =
+      document.createElement('option');
+
+    option.value =
+      machine.id;
+
+    option.textContent =
+      `${machine.name || machine.id} · ${
+        machine.online
+          ? 'ONLINE'
+          : 'OFFLINE'
+      }`;
+
+    selector.appendChild(
+      option
+    );
+  });
+
+  const existe =
+    data.machines.some(
+      machine =>
+        machine.id === machineId
+    );
+
+  if (
+    !existe &&
+    data.machines.length > 0
+  ) {
+    machineId =
+      data.machines[0].id;
+  }
+
+  selector.value =
+    machineId;
+
+  localStorage.setItem(
+    'dglMachineId',
+    machineId
+  );
+}
+
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+
+function render(machine) {
+
+  currentMachine = machine;
+
+  const telemetry =
+    machine.telemetry || {};
+
+  setText(
+    'machineName',
+    machine.name || machine.id
+  );
+
+  setText(
+    'machineLocation',
+    machine.location ||
+    'Sin ubicación'
+  );
+
+
+  /* RECAUDACIÓN ACTUAL */
+
+  setText(
+    'collectionCurrent',
+    money(
+      machine.collectionCurrent
+    )
+  );
+
+  setText(
+    'collectionCurrent2',
+    money(
+      machine.collectionCurrent
+    )
+  );
+
+  setText(
+    'collectionSince',
+    machine.collectionSince
+      ? `Desde ${fmtDate(
+          machine.collectionSince
+        )}`
+      : 'Desde el inicio del registro'
+  );
+
+
+  /* TOTALES */
+
+  setText(
+    'today',
+    money(
+      telemetry.totalToday
+    )
+  );
+
+  /*
+    Mes / período visible:
+    después de recaudar vuelve a 0.
+  */
+
+  setText(
+    'month',
+    money(
+      machine.collectionCurrent
+    )
+  );
+
+  setText(
+    'in1',
+    money(
+      telemetry.totalIn1
+    )
+  );
+
+  setText(
+    'in2',
+    money(
+      telemetry.totalIn2
+    )
+  );
+
+  setText(
+    'out1',
+    money(
+      telemetry.totalOut1
+    )
+  );
+
+  setText(
+    'out2',
+    money(
+      telemetry.totalOut2
+    )
+  );
+
+
+  /* HOPPERS */
+
+  setText(
+    'pending1',
+    `${telemetry.pending1 || 0} monedas`
+  );
+
+  setText(
+    'pending2',
+    `${telemetry.pending2 || 0} monedas`
+  );
+
+
+  /* ESTADOS */
+
+  setText(
+    'state1',
+    telemetry.state1 ||
+    'SIN DATOS'
+  );
+
+  setText(
+    'state2',
+    telemetry.state2 ||
+    'SIN DATOS'
+  );
+
+
+  /* WIFI */
+
+  setText(
+    'wifi',
+    `WiFi: ${
+      telemetry.wifiRssi ?? -100
+    } dBm`
+  );
+
+
+  /* RESUMEN */
+
+  setText(
+    'lastSeen',
+    fmtDate(
+      machine.updatedAt
+    )
+  );
+
+  setText(
+    'volumeSummary',
+    `${telemetry.audioVolume ?? 22}/30`
+  );
+
+  setText(
+    'collectionsCount',
+    machine.collectionsCount || 0
+  );
+
+  setText(
+    'cloudSummary',
+    machine.online
+      ? 'ONLINE'
+      : 'OFFLINE'
+  );
+
+
+  /* VOLUMEN */
+
+  $('volume').value =
+    telemetry.audioVolume ?? 22;
+
+  setText(
+    'volumeLabel',
+    telemetry.audioVolume ?? 22
+  );
+
+
+  /* ONLINE */
+
+  const pill =
+    $('onlinePill');
+
+  pill.textContent =
+    machine.online
+      ? 'ONLINE'
+      : 'OFFLINE';
+
+  pill.classList.toggle(
+    'online',
+    machine.online
+  );
+
+
+  const status =
+    $('globalStatus');
+
+  status.innerHTML =
+    `<span></span>${
+      machine.online
+        ? 'Conectada'
+        : 'Sin conexión'
+    }`;
+
+  status.classList.toggle(
+    'online',
+    machine.online
+  );
+
+
+  renderEvents(
+    machine.events || []
+  );
+}
+
+
+/* =========================================================
+   EVENTOS
+========================================================= */
+
+function renderEvents(events) {
+
+  const html =
+    events
+      .slice(0, 80)
+      .map(event => {
+
+        return `
+          <div class="event">
+
+            <time>
+              ${escapeHtml(
+                fmtDate(event.at)
+              )}
+            </time>
+
+            <p>
+              ${escapeHtml(
+                event.message ||
+                event.type ||
+                'Evento'
+              )}
+            </p>
+
+          </div>
+        `;
+      })
+      .join('');
+
+  $('events').innerHTML =
+    html ||
+    '<p class="muted">Sin eventos.</p>';
+}
+
+
+/* =========================================================
+   REFRESH
+========================================================= */
+
+async function refresh() {
+
+  if (
+    !adminKey ||
+    !machineId
+  ) {
+    return;
+  }
+
+  try {
+
+    const data =
+      await api(
+        `/api/machines/${machineId}`
+      );
+
+    render(
+      data.machine
+    );
+
+    const collectionView =
+      document.querySelector(
+        '#view-collections.active'
+      );
+
+    if (collectionView) {
+      await loadCollections(false);
+    }
+
+  } catch (error) {
+
+    if (
+      error.message
+        .toLowerCase()
+        .includes('clave')
+    ) {
+
+      $('login')
+        .classList
+        .remove('hidden');
+
+      $('app')
+        .classList
+        .add('hidden');
+
+    } else {
+
+      const status =
+        $('globalStatus');
+
+      status.innerHTML =
+        '<span></span>Servidor desconectado';
+
+      status.classList.remove(
+        'online'
+      );
+    }
+  }
+}
+
+function startRefresh() {
+
+  clearInterval(
+    refreshTimer
+  );
+
+  let ticks = 0;
+
+  refreshTimer =
+    setInterval(
+      async () => {
+
+        await refresh();
+
+        ticks++;
+
+        if (
+          ticks % 12 === 0
+        ) {
+
+          await loadMachines()
+            .catch(() => {});
+        }
+
+      },
+      2500
+    );
+}
+
+
+/* =========================================================
+   COMANDOS CLOUD
+========================================================= */
+
+async function command(
+  type,
+  payload = {}
+) {
+
+  const data =
+    await api(
+      `/api/machines/${machineId}/commands`,
+      {
+        method: 'POST',
+
+        body:
+          JSON.stringify({
+            type,
+            payload
+          })
+      }
+    );
+
+  toast(
+    `Comando enviado a ${machineId}`
+  );
+
+  return data;
+}
+
+
+/* =========================================================
+   MODAL PIN
+========================================================= */
+
+function openModal({
+  title,
+  text,
+  showNote = false,
+  onConfirm
+}) {
+
+  $('modalTitle').textContent =
+    title;
+
+  $('modalText').textContent =
+    text;
+
+  $('modalPin').value = '';
+
+  $('modalNote').value = '';
+
+  $('modalError').textContent = '';
+
+  $('noteWrap')
+    .classList
+    .toggle(
+      'hidden',
+      !showNote
+    );
+
+  $('modalNote')
+    .classList
+    .toggle(
+      'hidden',
+      !showNote
+    );
+
+  pendingModalAction =
+    onConfirm;
+
+  $('modal')
+    .classList
+    .remove('hidden');
+
+  setTimeout(
+    () => {
+      $('modalPin').focus();
+    },
+    50
+  );
+}
+
+function closeModal() {
+
+  $('modal')
+    .classList
+    .add('hidden');
+
+  pendingModalAction =
+    null;
+}
+
+async function confirmModal() {
+
+  if (!pendingModalAction) {
+    return;
+  }
+
+  const pin =
+    $('modalPin')
+      .value
+      .trim();
+
+  const note =
+    $('modalNote')
+      .value
+      .trim();
+
+  $('modalError')
+    .textContent = '';
+
+  $('modalConfirm')
+    .disabled = true;
+
+  try {
+
+    await pendingModalAction(
+      pin,
+      note
+    );
+
+    closeModal();
+
+  } catch (error) {
+
+    $('modalError')
+      .textContent =
+        error.message;
+
+  } finally {
+
+    $('modalConfirm')
+      .disabled = false;
+  }
+}
+
+
+/* =========================================================
+   PAGO REMOTO
+========================================================= */
+
+function requestPayment(amount) {
+
+  const changer =
+    Number(
+      $('changer').value
+    );
+
+  amount =
+    Number(amount);
+
+  if (
+    !Number.isInteger(amount) ||
+    amount < 100 ||
+    amount > 20000 ||
+    amount % 100 !== 0
+  ) {
+
+    toast(
+      'Monto inválido'
+    );
+
+    return;
+  }
+
+  openModal({
+
+    title:
+      'Confirmar pago remoto',
+
+    text:
+      `${currentMachine?.name || machineId} · ` +
+      `Cambiador ${changer} · ` +
+      `${money(amount)}. ` +
+      `Ingresa el código 2324 para autorizar la entrega.`,
+
+    onConfirm:
+      async pin => {
+
+        await command(
+          'pay',
+          {
+            changer,
+            amount,
+            confirmationCode: pin
+          }
+        );
+      }
+  });
+}
+
+
+/* =========================================================
+   RECAUDACIONES
+========================================================= */
+
+async function loadCollections(
+  showToast = false
+) {
+
+  try {
+
+    const data =
+      await api(
+        `/api/machines/${machineId}/collections`
+      );
+
+    collectionData =
+      data.machine;
+
+
+    setText(
+      'collectionCurrent2',
+      money(
+        collectionData.current
+      )
+    );
+
+    setText(
+      'collectedTotal',
+      money(
+        collectionData.totalCollected
+      )
+    );
+
+    setText(
+      'collectedCount',
+      `${collectionData.count} ${
+        collectionData.count === 1
+          ? 'registro'
+          : 'registros'
+      }`
+    );
+
+    setText(
+      'historicHidden',
+      money(
+        collectionData.totalHistoric
+      )
+    );
+
+
+    renderCollections(
+      collectionData.collections || []
+    );
+
+
+    if (showToast) {
+
+      toast(
+        'Recaudación actualizada'
+      );
+    }
+
+  } catch (error) {
+
+    if (showToast) {
+
+      toast(
+        error.message
+      );
+    }
+  }
+}
+
+function renderCollections(items) {
+
+  const html =
+    items
+      .map(
+        (item, index) => {
+
+          return `
+
+            <div class="collection-row">
+
+              <div>
+
+                <strong>
+                  #${items.length - index}
+                </strong>
+
+                <br>
+
+                <span>
+                  ${escapeHtml(
+                    fmtDate(item.at)
+                  )}
+                </span>
+
+              </div>
+
+
+              <div>
+
+                <span>
+                  Recaudado
+                </span>
+
+                <br>
+
+                <strong>
+                  ${money(item.amount)}
+                </strong>
+
+              </div>
+
+
+              <div>
+
+                <span>
+                  Histórico al retiro
+                </span>
+
+                <br>
+
+                <strong>
+                  ${money(
+                    item.historicAtCollection
+                  )}
+                </strong>
+
+              </div>
+
+
+              <div>
+
+                <span>
+                  ${escapeHtml(
+                    item.note ||
+                    'Sin nota'
+                  )}
+                </span>
+
+              </div>
+
+            </div>
+          `;
+        }
+      )
+      .join('');
+
+  $('collectionsTable')
+    .innerHTML =
+      html ||
+      '<p class="muted">Sin recaudaciones todavía.</p>';
+}
+
+function registerCollection() {
+
+  if (
+    !currentMachine?.online
+  ) {
+
+    toast(
+      'La máquina debe estar ONLINE para recaudar'
+    );
+
+    return;
+  }
+
+
+  openModal({
+
+    title:
+      'Registrar recaudación',
+
+    text:
+      `Se guardará el monto actual de ${currentMachine.name} ` +
+      `y el contador visible volverá a $0. ` +
+      `El histórico real NO se borra.`,
+
+    showNote: true,
+
+    onConfirm:
+      async (
+        pin,
+        note
+      ) => {
+
+        const data =
+          await api(
+            `/api/machines/${machineId}/collections`,
+            {
+              method: 'POST',
+
+              body:
+                JSON.stringify({
+                  pin,
+                  note
+                })
+            }
+          );
+
+
+        toast(
+          `Recaudación guardada: ${
+            money(
+              data.collection.amount
+            )
+          }`
+        );
+
+
+        await refresh();
+
+        await loadCollections();
+      }
+  });
+}
+
+
+/* =========================================================
+   EXPORTAR RECAUDACIONES CSV
+========================================================= */
+
+function exportCollections() {
+
+  if (!collectionData) {
+    return;
+  }
+
+  const rows = [
+
+    [
+      'Fecha',
+      'Maquina',
+      'Monto recaudado',
+      'Historico al retiro',
+      'Hoy al retiro',
+      'Mes al retiro',
+      'Nota'
+    ],
+
+    ...(
+      collectionData.collections || []
+    ).map(item => [
+
+      item.at,
+
+      collectionData.name,
+
+      item.amount,
+
+      item.historicAtCollection,
+
+      item.todayAtCollection,
+
+      item.monthAtCollection,
+
+      item.note || ''
+    ])
+  ];
+
+
+  const csv =
+    rows
+      .map(
+        row =>
+          row
+            .map(
+              value =>
+                `"${String(
+                  value ?? ''
+                ).replaceAll(
+                  '"',
+                  '""'
+                )}"`
+            )
+            .join(';')
+      )
+      .join('\n');
+
+
+  const blob =
+    new Blob(
+      [
+        '\ufeff' +
+        csv
+      ],
+      {
+        type:
+          'text/csv;charset=utf-8'
+      }
+    );
+
+
+  const link =
+    document.createElement('a');
+
+  link.href =
+    URL.createObjectURL(blob);
+
+  link.download =
+    `recaudaciones_${machineId}.csv`;
+
+  link.click();
+
+  URL.revokeObjectURL(
+    link.href
+  );
+}
+
+
+/* =========================================================
+   NAVEGACIÓN
+========================================================= */
+
+function switchView(view) {
+
+  document
+    .querySelectorAll('.view')
+    .forEach(
+      element =>
+        element
+          .classList
+          .remove('active')
+    );
+
+
+  document
+    .querySelectorAll('.nav-btn')
+    .forEach(
+      button =>
+        button
+          .classList
+          .toggle(
+            'active',
+            button.dataset.view === view
+          )
+    );
+
+
+  const target =
+    $(`view-${view}`);
+
+  if (target) {
+
+    target
+      .classList
+      .add('active');
+  }
+
+
+  const titles = {
+
+    dashboard:
+      'Dashboard',
+
+    control:
+      'Control',
+
+    collections:
+      'Recaudación',
+
+    activity:
+      'Actividad'
+  };
+
+
+  setText(
+    'viewTitle',
+    titles[view] ||
+    'DGL'
+  );
+
+
+  if (
+    view ===
+    'collections'
+  ) {
+
+    loadCollections();
+  }
+}
+
+
+/* =========================================================
+   VOCES
+========================================================= */
+
+function initVoices() {
+
+  const select =
+    $('voice');
+
+  VOICES.forEach(
+    (
+      label,
+      index
+    ) => {
+
+      const option =
+        document.createElement(
+          'option'
+        );
+
+      option.value =
+        index + 1;
+
+      option.textContent =
+        `${String(
+          index + 1
+        ).padStart(
+          2,
+          '0'
+        )} · ${label}`;
+
+      select.appendChild(
+        option
+      );
+    }
+  );
+}
+
+
+/* =========================================================
+   BOTONES
+========================================================= */
+
+$('loginBtn').onclick =
+  login;
+
+
+$('adminKey').onkeydown =
+  event => {
+
+    if (
+      event.key ===
+      'Enter'
+    ) {
+
+      login();
+    }
+  };
+
+
+$('logoutBtn').onclick =
+  logout;
+
+
+$('machineSelect').onchange =
+  async event => {
+
+    machineId =
+      event.target.value;
+
+    localStorage.setItem(
+      'dglMachineId',
+      machineId
+    );
+
+    await refresh();
+  };
+
+
+document
+  .querySelectorAll(
+    '.nav-btn'
+  )
+  .forEach(
+    button => {
+
+      button.onclick =
+        () =>
+          switchView(
+            button.dataset.view
+          );
+    }
+  );
+
+
+/* PAGO ESCRITO */
+
+$('payBtn').onclick =
+  () =>
+    requestPayment(
+      $('amount').value
+    );
+
+
+/* PAGOS RÁPIDOS */
+
+document
+  .querySelectorAll(
+    '[data-pay]'
+  )
+  .forEach(
+    button => {
+
+      button.onclick =
+        () =>
+          requestPayment(
+            button.dataset.pay
+          );
+    }
+  );
+
+
+/* COMANDOS GENERALES */
+
+document
+  .querySelectorAll(
+    '[data-command]'
+  )
+  .forEach(
+    button => {
+
+      button.onclick =
+        async () => {
+
+          const type =
+            button.dataset.command;
+
+          try {
+
+            if (
+              type ===
+              'set_mute'
+            ) {
+
+              await command(
+                type,
+                {
+                  muted:
+                    button.dataset.value ===
+                    'true'
+                }
+              );
+
+            } else if (
+              type ===
+              'enable_acceptors'
+            ) {
+
+              await command(
+                type,
+                {
+                  enabled:
+                    button.dataset.enabled ===
+                    'true'
+                }
+              );
+
+            } else {
+
+              await command(
+                type,
+                {}
+              );
+            }
+
+          } catch (error) {
+
+            toast(
+              error.message
+            );
+          }
+        };
+    }
+  );
+
+
+/* VOLUMEN */
+
+let volumeTimer;
+
+$('volume').oninput =
+  event => {
+
+    setText(
+      'volumeLabel',
+      event.target.value
+    );
+
+    clearTimeout(
+      volumeTimer
+    );
+
+    volumeTimer =
+      setTimeout(
+        () =>
+          command(
+            'set_volume',
+            {
+              volume:
+                Number(
+                  event.target.value
+                )
+            }
+          )
+          .catch(
+            error =>
+              toast(
+                error.message
+              )
+          ),
+        500
+      );
+  };
+
+
+/* VOZ */
+
+$('voiceBtn').onclick =
+  () =>
+    command(
+      'play_voice',
+      {
+        voice:
+          Number(
+            $('voice').value
+          )
+      }
+    )
+    .catch(
+      error =>
+        toast(
+          error.message
+        )
+    );
+
+
+/* RECAUDACIÓN */
+
+$('collectBtn').onclick =
+  registerCollection;
+
+
+/* MOSTRAR HISTÓRICO */
+
+$('revealHistoric').onclick =
+  () => {
+
+    const card =
+      $('historicHidden')
+        .closest(
+          '.secret'
+        );
+
+    card
+      .classList
+      .toggle(
+        'revealed'
+      );
+
+    $('revealHistoric')
+      .textContent =
+        card
+          .classList
+          .contains(
+            'revealed'
+          )
+          ? 'Ocultar'
+          : 'Mostrar';
+  };
+
+
+/* CSV */
+
+$('exportCollections').onclick =
+  exportCollections;
+
+
+/* MODAL */
+
+$('modalClose').onclick =
+  closeModal;
+
+$('modalConfirm').onclick =
+  confirmModal;
+
+$('modalPin').onkeydown =
+  event => {
+
+    if (
+      event.key ===
+      'Enter'
+    ) {
+
+      confirmModal();
+    }
+  };
+
+$('modal').onclick =
+  event => {
+
+    if (
+      event.target ===
+      $('modal')
+    ) {
+
+      closeModal();
+    }
+  };
+
+
+/* =========================================================
+   ARRANQUE
+========================================================= */
+
+async function start() {
+
+  initVoices();
+
+  if (!adminKey) {
+    return;
+  }
+
+  try {
+
+    await api(
+      '/api/login',
+      {
+        method: 'POST',
+        body:
+          JSON.stringify({
+            key: adminKey
+          })
+      }
+    );
+
+    $('login')
+      .classList
+      .add('hidden');
+
+    $('app')
+      .classList
+      .remove('hidden');
+
+
+    await loadMachines();
+
+    await refresh();
+
+    startRefresh();
+
+  } catch (_) {
+
+    localStorage.removeItem(
+      'dglAdminKey'
+    );
+
+    adminKey = '';
+  }
+}
+
+start();
